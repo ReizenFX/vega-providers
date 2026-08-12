@@ -8,7 +8,7 @@ const myManualHeaders = {
 };
 
 const getEpisodes = async (args) => {
-    const { url, providerContext } = args; // 'url' is the Anime ID
+    const { url, providerContext } = args;
     const { axios } = providerContext;
     const episodes = [];
     let currentPage = 1;
@@ -22,10 +22,11 @@ const getEpisodes = async (args) => {
             if (json && json.data) {
                 lastPage = json.last_page || 1;
                 for (const ep of json.data) {
+                    // THE FIX: We use ep.anime_id (Internal ID) instead of the UUID url
+                    const internalId = ep.anime_id || url; 
                     episodes.push({
                         title: `Episode ${ep.episode}`,
-                        // WE PACK BOTH IDs TOGETHER HERE: "AnimeID|EpisodeSession"
-                        link: `${url}|${ep.session}`, 
+                        link: `${internalId}|${ep.session}`, 
                         image: ep.snapshot || ""
                     });
                 }
