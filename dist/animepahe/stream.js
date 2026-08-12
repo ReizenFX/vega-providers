@@ -9,27 +9,46 @@ const myManualHeaders = {
     "Accept": "application/json, text/javascript, */*; q=0.01"
 };
 
+// THE DECRYPTOR: Rips the obfuscated Kwik code apart to find the raw video URL
+function unpackKwik(html) {
+    const packedMatch = html.match(/eval\(function\(p,a,c,k,e,d\).+?return p\}?\('(.*?)',\s*(\d+),\s*(\d+),\s*'([^']+)'\.split\('\|'\)/s);
+    if (!packedMatch) return null;
+    
+    let p = packedMatch[1];
+    const a = parseInt(packedMatch[2], 10);
+    let c = parseInt(packedMatch[3], 10);
+    const k = packedMatch[4].split('|');
+    
+    const e = function(c) {
+        return (c < a ? '' : e(Math.floor(c / a))) + ((c % a) > 35 ? String.fromCharCode((c % a) + 29) : (c % a).toString(36));
+    };
+    
+    while (c--) {
+        if (k[c]) {
+            const regex = new RegExp('\\b' + e(c) + '\\b', 'g');
+            p = p.replace(regex, k[c]);
+        }
+    }
+    
+    const m3u8Match = p.match(/(https?:\/\/[^'"]+\.m3u8[^'"]*)/);
+    return m3u8Match ? m3u8Match[1] : null;
+}
+
 const getStream = async (args) => {
     const { link, providerContext } = args;
     const { axios } = providerContext;
     const streams = [];
     
     try {
-        // UNPACK THE IDs
         const [animeId, episodeSession] = link.split('|');
-        
-        // Safety net if you click an old cached episode by accident
-        if (!episodeSession) {
-            return [{ server: `ERROR: Go back to Anime page to reload episodes!`, link: "error", type: 'embed' }];
-        }
+        if (!episodeSession) return [{ server: "ERROR: Reload Episodes", link: "error", type: 'embed' }];
 
-        // We now pass BOTH the Anime ID and Episode Session to the server!
         const apiUrl = `https://animepahe.pw/api?m=links&id=${animeId}&session=${episodeSession}&p=kwik`;
         const res = await axios.get(apiUrl, { headers: myManualHeaders });
         const json = res.data;
         
         if (typeof json === 'string' && json.includes('<html')) {
-            return [{ server: `ERROR: Cloudflare Blocked Video API`, link: "error", type: 'embed' }];
+            return [{ server: "ERROR: CF Blocked Video API", link: "error", type: 'embed' }];
         }
         
         if (json && json.data) {
@@ -40,22 +59,34 @@ const getStream = async (args) => {
                     const subType = streamData.fansub || streamData.audio || "ENG";
                     
                     if (kwikLink) {
-                        streams.push({ 
-                            server: `Kwik ${resKey}p (${subType})`, 
-                            link: kwikLink, 
-                            type: 'embed' 
-                        });
+                        try {
+                            // 1. Fetch the Kwik site using our keys to bypass Cloudflare
+                            const kwikRes = await axios.get(kwikLink, { 
+                                headers: { ...myManualHeaders, "Referer": "https://animepahe.pw/" } 
+                            });
+                            
+                            // 2. Decrypt the site to get the direct video link
+                            const m3u8Link = unpackKwik(kwikRes.data);
+                            
+                            if (m3u8Link) {
+                                streams.push({ 
+                                    server: `Kwik ${resKey}p (${subType})`, 
+                                    link: m3u8Link, 
+                                    type: 'm3u8', // We tell Vega this is a raw video, NOT an embed!
+                                    headers: { "Referer": new URL(kwikLink).origin }
+                                });
+                            } else {
+                                streams.push({ server: `Unpack Failed ${resKey}p`, link: kwikLink, type: 'embed' });
+                            }
+                        } catch (err) {
+                            streams.push({ server: `Kwik Fetch Error`, link: "error", type: 'embed' });
+                        }
                     }
                 }
             }
         }
         
-        if (streams.length === 0) {
-            return [{ server: `EMPTY JSON: No streams found`, link: "error", type: 'embed' }];
-        }
-        
-        return streams;
-        
+        return streams.length > 0 ? streams : [{ server: "No Streams Found", link: "error", type: 'embed' }];
     } catch (error) {
         return [{ server: `CRASH LOG: ${error.message}`, link: "error", type: 'embed' }];
     }
