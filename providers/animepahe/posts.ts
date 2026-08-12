@@ -1,13 +1,14 @@
-export async function getPosts({ searchQuery }: { searchQuery?: string }) {
-    if (!searchQuery) return [];
+export async function getPosts({ filter, searchQuery }: { filter?: string, searchQuery?: string }) {
+    // If there is no search query (like when the app first opens the home screen), 
+    // we use a default search word so the screen isn't empty!
+    const query = searchQuery || "dragon"; 
 
     try {
-        const res = await fetch(`https://animepahe.ru/api?m=search&q=${encodeURIComponent(searchQuery)}`);
+        const res = await fetch(`https://animepahe.ru/api?m=search&q=${encodeURIComponent(query)}`);
         const json = await res.json();
 
         if (!json || !json.data) return [];
 
-        // Adding strict types here prevents GitHub from failing the build
         return json.data.map((item: { title: string, session: string, poster: string }) => ({
             title: item.title,
             link: item.session, 
