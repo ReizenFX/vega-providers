@@ -1,5 +1,13 @@
 [
   {
+    "display_name": "AnimePahe",
+    "value": "AnimePahe",
+    "version": "1.0",
+    "icon": "",
+    "type": "english",
+    "disabled": false
+  },
+  {
     "display_name": "VMovies",
     "value": "vega",
     "version": "2.26",
