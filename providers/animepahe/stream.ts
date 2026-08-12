@@ -1,9 +1,10 @@
-export const getStream = async ({ link, type, signal, providerContext }: any) => {
-    try {
-        if (!link || link.includes("dummy")) throw new Error("Bypass");
+export const getStream = async (args: any) => {
+    const { link, providerContext } = args;
+    const { axios } = providerContext;
 
-        const res = await fetch(`https://animepahe.ru/api?m=links&id=${link}&p=kwik`);
-        const json = await res.json();
+    try {
+        const res = await axios.get(`https://animepahe.pw/api?m=links&id=${link}&p=kwik`);
+        const json = res.data;
         const streams: any[] = [];
         
         if (json && json.data) {
@@ -20,7 +21,7 @@ export const getStream = async ({ link, type, signal, providerContext }: any) =>
         throw new Error("Bypass");
     } catch (error) {
         return [
-            { server: "Test Server", link: "https://example.com/test.mp4", type: "mp4" }
+            { server: "Kwik Test", link: "https://kwik.cx/e/dummy", type: "embed" }
         ];
     }
 };
