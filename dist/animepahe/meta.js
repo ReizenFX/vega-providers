@@ -18,43 +18,33 @@ const getMeta = async (args) => {
         const title = $('h1').first().text().trim() || "Unknown Title";
         const synopsis = $('.anime-synopsis').text().trim() || "No synopsis available.";
         
-        // AGGRESSIVE IMAGE SCRAPER: Checks every possible hiding spot for the poster
         let image = $('.anime-poster img').attr('src') || 
                     $('.anime-poster img').attr('data-src') || 
-                    $('.anime-poster a').attr('href') ||
-                    $('img[src*="uploads/posters"]').attr('src') || 
                     $('a[href*="uploads/posters"]').attr('href') || 
+                    $('img[src*="uploads/posters"]').attr('src') || 
                     "";
                     
-        // Fix protocol-relative URLs (Forces the app to read it as a secure link)
-        if (image.startsWith('//')) {
-            image = 'https:' + image;
-        } else if (image.startsWith('/')) {
-            image = 'https://animepahe.pw' + image;
+        // THE FIX: Only run startsWith if the image actually exists
+        if (image && typeof image === 'string') {
+            if (image.startsWith('//')) {
+                image = 'https:' + image;
+            } else if (image.startsWith('/')) {
+                image = 'https://animepahe.pw' + image;
+            }
+        } else {
+            image = "https://upload.wikimedia.org/wikipedia/commons/a/a7/Blank_image.jpg";
         }
 
         return {
-            title,
-            synopsis,
-            image,
-            type: "series",
-            linkList: [
-                {
-                    title: "Episodes",
-                    directLinks: [],
-                    episodesLink: link,
-                    quality: "HD"
-                }
-            ],
+            title, synopsis, image, type: "series",
+            linkList: [{ title: "Episodes", directLinks: [], episodesLink: link, quality: "HD" }],
             webUrl: `https://animepahe.pw/anime/${link}`
         };
     } catch (error) {
         return {
-            title: "Metadata Failed",
-            synopsis: "Failed to load page. Cloudflare might have blocked this request.",
+            title: "Metadata Failed", synopsis: "Failed to load page.",
             image: "https://upload.wikimedia.org/wikipedia/commons/a/a7/Blank_image.jpg",
-            type: "series",
-            linkList: [{ title: "Episodes", directLinks: [], episodesLink: link, quality: "HD" }],
+            type: "series", linkList: [{ title: "Episodes", directLinks: [], episodesLink: link, quality: "HD" }],
             webUrl: `https://animepahe.pw/anime/${link}`
         };
     }
