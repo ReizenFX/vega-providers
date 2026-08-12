@@ -1,6 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStream = void 0;
+import { Stream, ProviderContext } from "../types";
 
 const myManualHeaders = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
@@ -9,10 +7,15 @@ const myManualHeaders = {
     "Accept": "application/json, text/javascript, */*; q=0.01"
 };
 
-const getStream = async (args) => {
-    const { link, providerContext } = args;
+export const getStream = async function ({
+  link,
+  providerContext,
+}: {
+  link: string;
+  providerContext: ProviderContext;
+}): Promise<Stream[]> {
     const { axios } = providerContext;
-    const streams = [];
+    const streams: Stream[] = [];
     
     try {
         // UNPACK THE IDs
@@ -28,6 +31,7 @@ const getStream = async (args) => {
         const res = await axios.get(apiUrl, { headers: myManualHeaders });
         const json = res.data;
         
+        // If Cloudflare blocks this specific API endpoint, it returns HTML instead of JSON
         if (typeof json === 'string' && json.includes('<html')) {
             return [{ server: `ERROR: Cloudflare Blocked Video API`, link: "error", type: 'embed' }];
         }
@@ -56,8 +60,7 @@ const getStream = async (args) => {
         
         return streams;
         
-    } catch (error) {
+    } catch (error: any) {
         return [{ server: `CRASH LOG: ${error.message}`, link: "error", type: 'embed' }];
     }
 };
-exports.getStream = getStream;
