@@ -1,32 +1,38 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getSearchPosts = exports.getPosts = void 0;
+
 const getPosts = async (args) => {
+    // We will search a popular default so the home screen isn't empty
     return (0, exports.getSearchPosts)({ ...args, searchQuery: "dragon" });
 };
 exports.getPosts = getPosts;
+
 const getSearchPosts = async (args) => {
     const { searchQuery, providerContext } = args;
     const { axios } = providerContext;
-    const fallback = Array.from({ length: 5 }).map((_, i) => ({
-        title: `AnimePahe Check ${i + 1}`,
-        link: "98b0deea-2c93-2b47-c023-a98ab7bbc0d4",
-        image: "https://upload.wikimedia.org/wikipedia/commons/a/a7/Blank_image.jpg"
-    }));
-    try {
-        const query = searchQuery || "dragon";
-        const res = await axios.get(`https://animepahe.pw/api?m=search&q=${encodeURIComponent(query)}`);
-        const json = res.data;
-        if (json && json.data && json.data.length >= 3) {
-            return json.data.map((item) => ({
-                title: item.title,
-                link: String(item.session),
-                image: item.poster
-            }));
+
+    const query = searchQuery || "dragon";
+    
+    // NO FAKE DATA FALLBACKS. 
+    // We pass a normal User-Agent, and if Cloudflare blocks it, 
+    // we let the Vega app handle the error natively instead of hiding it.
+    const res = await axios.get(`https://animepahe.pw/api?m=search&q=${encodeURIComponent(query)}`, {
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        return fallback;
-    } catch (error) {
-        return fallback;
+    });
+
+    const json = res.data;
+    
+    if (json && json.data) {
+        return json.data.map((item) => ({
+            title: item.title,
+            link: String(item.session),
+            image: item.poster
+        }));
     }
+    
+    return [];
 };
 exports.getSearchPosts = getSearchPosts;
