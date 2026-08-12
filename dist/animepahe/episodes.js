@@ -10,20 +10,31 @@ const myManualHeaders = {
 const getEpisodes = async (args) => {
     const { url, providerContext } = args;
     const { axios } = providerContext;
+    const episodes = [];
+    let currentPage = 1;
+    let lastPage = 1;
     
     try {
-        const res = await axios.get(`https://animepahe.pw/api?m=release&id=${url}&sort=episode_asc&page=1`, {
-            headers: myManualHeaders
-        });
-        const json = res.data;
+        do {
+            const res = await axios.get(`https://animepahe.pw/api?m=release&id=${url}&sort=episode_asc&page=${currentPage}`, { headers: myManualHeaders });
+            const json = res.data;
+            
+            if (json && json.data) {
+                lastPage = json.last_page || 1;
+                for (const ep of json.data) {
+                    episodes.push({
+                        title: `Episode ${ep.episode}`,
+                        link: ep.session, // The episode's unique ID for the stream
+                        image: ep.snapshot || ""
+                    });
+                }
+            } else {
+                break;
+            }
+            currentPage++;
+        } while (currentPage <= lastPage);
         
-        if (json && json.data) {
-            return json.data.map((ep) => ({
-                title: `Episode ${ep.episode}`,
-                link: ep.session,
-            }));
-        }
-        return [];
+        return episodes;
     } catch (error) {
         return [];
     }
