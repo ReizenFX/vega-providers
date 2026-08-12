@@ -8,7 +8,7 @@ const myManualHeaders = {
 };
 
 const getEpisodes = async (args) => {
-    const { url, providerContext } = args;
+    const { url, providerContext } = args; // 'url' is the Anime ID
     const { axios } = providerContext;
     const episodes = [];
     let currentPage = 1;
@@ -24,7 +24,8 @@ const getEpisodes = async (args) => {
                 for (const ep of json.data) {
                     episodes.push({
                         title: `Episode ${ep.episode}`,
-                        link: ep.session, // The episode's unique ID for the stream
+                        // WE PACK BOTH IDs TOGETHER HERE: "AnimeID|EpisodeSession"
+                        link: `${url}|${ep.session}`, 
                         image: ep.snapshot || ""
                     });
                 }
