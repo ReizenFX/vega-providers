@@ -17,8 +17,22 @@ const getMeta = async (args) => {
         
         const title = $('h1').first().text().trim() || "Unknown Title";
         const synopsis = $('.anime-synopsis').text().trim() || "No synopsis available.";
-        const image = $('.anime-poster img').attr('src') || "";
         
+        // AGGRESSIVE IMAGE SCRAPER: Checks every possible hiding spot for the poster
+        let image = $('.anime-poster img').attr('src') || 
+                    $('.anime-poster img').attr('data-src') || 
+                    $('.anime-poster a').attr('href') ||
+                    $('img[src*="uploads/posters"]').attr('src') || 
+                    $('a[href*="uploads/posters"]').attr('href') || 
+                    "";
+                    
+        // Fix protocol-relative URLs (Forces the app to read it as a secure link)
+        if (image.startsWith('//')) {
+            image = 'https:' + image;
+        } else if (image.startsWith('/')) {
+            image = 'https://animepahe.pw' + image;
+        }
+
         return {
             title,
             synopsis,
@@ -28,7 +42,7 @@ const getMeta = async (args) => {
                 {
                     title: "Episodes",
                     directLinks: [],
-                    episodesLink: link, // Passes the session ID to episodes.js
+                    episodesLink: link,
                     quality: "HD"
                 }
             ],
