@@ -9,29 +9,32 @@ const myManualHeaders = {
     "Accept": "application/json, text/javascript, */*; q=0.01"
 };
 
-// THE DECRYPTOR: Rips the obfuscated Kwik code apart to find the raw video URL
+// THE DECRYPTOR: Digs into the Kwik HTML and pulls the direct video file required for downloading
 function unpackKwik(html) {
-    const packedMatch = html.match(/eval\(function\(p,a,c,k,e,d\).+?return p\}?\('(.*?)',\s*(\d+),\s*(\d+),\s*'([^']+)'\.split\('\|'\)/s);
-    if (!packedMatch) return null;
-    
-    let p = packedMatch[1];
-    const a = parseInt(packedMatch[2], 10);
-    let c = parseInt(packedMatch[3], 10);
-    const k = packedMatch[4].split('|');
-    
-    const e = function(c) {
-        return (c < a ? '' : e(Math.floor(c / a))) + ((c % a) > 35 ? String.fromCharCode((c % a) + 29) : (c % a).toString(36));
-    };
-    
-    while (c--) {
-        if (k[c]) {
-            const regex = new RegExp('\\b' + e(c) + '\\b', 'g');
-            p = p.replace(regex, k[c]);
+    try {
+        const packs = html.matchAll(/eval\(function\(p,a,c,k,e,d\).*?return p\}?\('(.*?)',\s*(\d+),\s*(\d+),\s*'([^']+)'\.split\('\|'\)/gs);
+        for (const match of packs) {
+            let p = match[1];
+            const a = parseInt(match[2], 10);
+            let c = parseInt(match[3], 10);
+            const k = match[4].split('|');
+
+            const e = function(c) {
+                return (c < a ? '' : e(Math.floor(c / a))) + ((c % a) > 35 ? String.fromCharCode((c % a) + 29) : (c % a).toString(36));
+            };
+
+            while (c--) {
+                if (k[c]) {
+                    const regex = new RegExp('\\b' + e(c) + '\\b', 'g');
+                    p = p.replace(regex, k[c]);
+                }
+            }
+
+            const m3u8Match = p.match(/(https?:\/\/[^'"]+\.m3u8[^'"]*)/);
+            if (m3u8Match) return m3u8Match[1];
         }
-    }
-    
-    const m3u8Match = p.match(/(https?:\/\/[^'"]+\.m3u8[^'"]*)/);
-    return m3u8Match ? m3u8Match[1] : null;
+    } catch (err) {}
+    return null;
 }
 
 const getStream = async (args) => {
@@ -41,15 +44,11 @@ const getStream = async (args) => {
     
     try {
         const [animeId, episodeSession] = link.split('|');
-        if (!episodeSession) return [{ server: "ERROR: Reload Episodes", link: "error", type: 'embed' }];
+        if (!episodeSession) return [{ server: "ERROR: Reload Episodes List", link: "error", type: 'embed' }];
 
         const apiUrl = `https://animepahe.pw/api?m=links&id=${animeId}&session=${episodeSession}&p=kwik`;
         const res = await axios.get(apiUrl, { headers: myManualHeaders });
         const json = res.data;
-        
-        if (typeof json === 'string' && json.includes('<html')) {
-            return [{ server: "ERROR: CF Blocked Video API", link: "error", type: 'embed' }];
-        }
         
         if (json && json.data) {
             for (const item of json.data) {
@@ -60,26 +59,34 @@ const getStream = async (args) => {
                     
                     if (kwikLink) {
                         try {
-                            // 1. Fetch the Kwik site using our keys to bypass Cloudflare
+                            // Fetch Kwik page to decrypt the .m3u8 (MANDATORY FOR DOWNLOADING)
                             const kwikRes = await axios.get(kwikLink, { 
-                                headers: { ...myManualHeaders, "Referer": "https://animepahe.pw/" } 
+                                headers: { 
+                                    "User-Agent": myManualHeaders["User-Agent"],
+                                    "Referer": "https://animepahe.pw/" 
+                                } 
                             });
                             
-                            // 2. Decrypt the site to get the direct video link
                             const m3u8Link = unpackKwik(kwikRes.data);
                             
                             if (m3u8Link) {
                                 streams.push({ 
                                     server: `Kwik ${resKey}p (${subType})`, 
                                     link: m3u8Link, 
-                                    type: 'm3u8', // We tell Vega this is a raw video, NOT an embed!
+                                    type: 'm3u8', // Tells Vega this is a raw video file it can download!
                                     headers: { "Referer": new URL(kwikLink).origin }
                                 });
                             } else {
-                                streams.push({ server: `Unpack Failed ${resKey}p`, link: kwikLink, type: 'embed' });
+                                throw new Error("Unpack failed");
                             }
                         } catch (err) {
-                            streams.push({ server: `Kwik Fetch Error`, link: "error", type: 'embed' });
+                            // Fallback just in case Kwik blocks the internal scrape
+                            streams.push({ 
+                                server: `Kwik ${resKey}p (Embed Fallback)`, 
+                                link: kwikLink, 
+                                type: 'embed', 
+                                headers: { "Referer": "https://animepahe.pw/" } 
+                            });
                         }
                     }
                 }
