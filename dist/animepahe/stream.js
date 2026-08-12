@@ -10,20 +10,23 @@ const myManualHeaders = {
 const getStream = async (args) => {
     const { link, providerContext } = args;
     const { axios } = providerContext;
+    const streams = [];
     
     try {
-        const res = await axios.get(`https://animepahe.pw/api?m=links&id=${link}&p=kwik`, {
-            headers: myManualHeaders
-        });
+        const res = await axios.get(`https://animepahe.pw/api?m=links&id=${link}&p=kwik`, { headers: myManualHeaders });
         const json = res.data;
-        const streams = [];
         
         if (json && json.data) {
-            for (const hostObj of json.data) {
-                for (const resolution in hostObj) {
-                    const kwikUrl = hostObj[resolution]?.kwik;
-                    if (kwikUrl) {
-                        streams.push({ server: `Kwik (${resolution})`, link: kwikUrl, type: 'embed' });
+            for (const item of json.data) {
+                for (const resKey in item) {
+                    const kwikLink = item[resKey].kwik;
+                    const subType = item[resKey].fansub || "ENG";
+                    if (kwikLink) {
+                        streams.push({ 
+                            server: `Kwik ${resKey} (${subType})`, 
+                            link: kwikLink, 
+                            type: 'embed' // Vega natively knows how to unpack Kwik embeds
+                        });
                     }
                 }
             }
