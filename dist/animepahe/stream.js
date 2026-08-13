@@ -2,7 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getStream = void 0;
 
+// The Kwik Unpacker (Rips the raw m3u8 video out for downloading)
 function unpackKwik(html) {
+    if (!html || typeof html !== 'string') return null;
     try {
         const packs = html.matchAll(/eval\(function\(p,a,c,k,e,d\).*?return p\}?\('(.*?)',\s*(\d+),\s*(\d+),\s*'([^']+)'\.split\('\|'\)/gs);
         for (const match of packs) {
@@ -14,10 +16,7 @@ function unpackKwik(html) {
                 return (c < a ? '' : e(Math.floor(c / a))) + ((c % a) > 35 ? String.fromCharCode((c % a) + 29) : (c % a).toString(36));
             };
             while (c--) {
-                if (k[c]) {
-                    const regex = new RegExp('\\b' + e(c) + '\\b', 'g');
-                    p = p.replace(regex, k[c]);
-                }
+                if (k[c]) p = p.replace(new RegExp('\\b' + e(c) + '\\b', 'g'), k[c]);
             }
             const m3u8Match = p.match(/(https?:\/\/[^'"]+\.m3u8[^'"]*)/);
             if (m3u8Match) return m3u8Match[1];
@@ -31,23 +30,31 @@ const getStream = async (args) => {
     const { axios, openWebView, commonHeaders } = providerContext;
     const baseUrl = "https://animepahe.pw";
 
+    const [animeId, episodeSession] = link.split('|');
+    if (!episodeSession) return [{ server: "ERROR: Reload Episodes", link: "error", type: 'embed' }];
+
+    const apiUrl = `${baseUrl}/api?m=links&id=${animeId}&session=${episodeSession}&p=kwik`;
     let wafCookies = "";
+    
+    // YOUR ANIMETSU LOGIC: Trigger WebView ONLY if the video API crashes/blocks us
     try {
-        await axios.get(baseUrl, { headers: { ...commonHeaders } });
-    } catch (e) {
-        const wafResult = await openWebView(baseUrl, { title: "Security Check", waitForCookie: "cf_clearance", force: true });
+        await axios.get(apiUrl, { headers: { ...commonHeaders, Referer: baseUrl } });
+    } catch (error) {
+        const wafResult = await openWebView(baseUrl, {
+            title: "Security Check",
+            description: "Solve captcha to fetch video.",
+            headers: { ...commonHeaders, Referer: baseUrl },
+            force: true,
+            waitForCookie: "cf_clearance"
+        });
         wafCookies = wafResult.cookies;
     }
 
-    const headers = { ...commonHeaders, Referer: baseUrl, ...(wafCookies ? { Cookie: wafCookies } : {}) };
+    const activeHeaders = { ...commonHeaders, Referer: baseUrl, ...(wafCookies ? { Cookie: wafCookies } : {}) };
     const streams = [];
     
     try {
-        const [animeId, episodeSession] = link.split('|');
-        if (!episodeSession) return [{ server: "ERROR: Reload Episodes", link: "error", type: 'embed' }];
-
-        const apiUrl = `https://animepahe.pw/api?m=links&id=${animeId}&session=${episodeSession}&p=kwik`;
-        const res = await axios.get(apiUrl, { headers });
+        const res = await axios.get(apiUrl, { headers: activeHeaders });
         const json = res.data;
         
         if (json && json.data) {
@@ -59,13 +66,14 @@ const getStream = async (args) => {
                     
                     if (kwikLink) {
                         try {
-                            const kwikRes = await axios.get(kwikLink, { headers: { ...headers, Referer: baseUrl } });
+                            const kwikRes = await axios.get(kwikLink, { headers: { ...activeHeaders, Referer: baseUrl } });
                             const m3u8Link = unpackKwik(kwikRes.data);
+                            
                             if (m3u8Link) {
                                 streams.push({ 
                                     server: `Kwik ${resKey}p (${subType})`, 
                                     link: m3u8Link, 
-                                    type: 'm3u8', // Required format to enable Vega Downloads!
+                                    type: 'm3u8', // Allows Vega to download the file natively!
                                     headers: { Referer: new URL(kwikLink).origin }
                                 });
                             }
@@ -78,7 +86,7 @@ const getStream = async (args) => {
         }
         return streams.length > 0 ? streams : [{ server: "No Streams Found", link: "error", type: 'embed' }];
     } catch (error) {
-        return [{ server: `API Failed`, link: "error", type: 'embed' }];
+        return [{ server: `API Crash: ${error.message}`, link: "error", type: 'embed' }];
     }
 };
 exports.getStream = getStream;
