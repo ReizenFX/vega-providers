@@ -2,9 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getMeta = void 0;
 
+// 🛑 PASTE YOUR MANUAL KEYS BACK IN HERE 🛑
 const myManualHeaders = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-    "Cookie": "cf_clearance=aJPRb3I4waL3ia6t0qGNZ9NlXswJ8DHlykzadLyJfB0-1786564146-1.2.1.1-IaF5aVVLunbDZM2HlKLBBAr0dKlOu4TtLiTrsYYuKf4TjtgtWjqYI1CnOqyls2RD1sr5SteLm4FiO.ewuTjqZETKnlyUPABxzMqvhfXqDdCyeOlwzDJPoXRn8XfDSq5WnOLdI5eoKWAF6Sq8pP9gjzhSHG5.oUIvqAiq.DHaT0swSycLH.876Hj_r9uYZj2HyWotZeH6WIE.k4WR4TL7j1MrAq5ALCl0veS_XqoanmOJ.Qu.svhIX_Ul4Jxyqg2NUOjZsOj8_uelcs1rXuL3xlOSkd3rjXxWrPmjoGv3PR1.UyZqYqgIxiiR3QX7dYxt.swRqcgCcVY4MavZ8rgcKrUQ6lcG6yt4UkyEZQVflQJNDplwdsDN3pITI6J9m.4zVE.D1n665ShGvNg4cT3U4j4OHT7BAoUmOAB6p7WVxxghgGD4bba9gOkVqV0bFadMSGHJ5A5FU9ThFHgu92v5tw;"
+    "User-Agent": "PASTE_USER_AGENT_HERE",
+    "Cookie": "cf_clearance=PASTE_COOKIE_HERE;"
 };
 
 const getMeta = async (args) => {
@@ -18,20 +19,23 @@ const getMeta = async (args) => {
         const title = $('h1').first().text().trim() || "Unknown Title";
         const synopsis = $('.anime-synopsis').text().trim() || "No synopsis available.";
         
-        let image = $('.anime-poster img').attr('src') || 
-                    $('.anime-poster img').attr('data-src') || 
-                    $('a[href*="uploads/posters"]').attr('href') || 
-                    $('img[src*="uploads/posters"]').attr('src') || 
-                    "";
-                    
-        if (image && typeof image === 'string') {
-            if (image.startsWith('//')) {
-                image = 'https:' + image;
-            } else if (image.startsWith('/')) {
-                image = 'https://animepahe.pw' + image;
-            }
+        let image = "https://upload.wikimedia.org/wikipedia/commons/a/a7/Blank_image.jpg";
+        
+        // THE FIX: Aggressive Regex Search using the exact pattern you found. 
+        // This ignores broken HTML classes and scans the raw document for the image.
+        const posterRegex = /(https?:\/\/[^\s"'<>]+\/uploads\/posters\/[^\s"'<>]+)/i;
+        const match = res.data.match(posterRegex);
+        
+        if (match && match[1]) {
+            image = match[1];
         } else {
-            image = "https://upload.wikimedia.org/wikipedia/commons/a/a7/Blank_image.jpg";
+            // Fallback just in case
+            const fallback = $('.anime-poster img').attr('src') || $('a[href*="uploads/posters"]').attr('href');
+            if (fallback) {
+                if (fallback.startsWith('//')) image = 'https:' + fallback;
+                else if (fallback.startsWith('/')) image = 'https://animepahe.pw' + fallback;
+                else image = fallback;
+            }
         }
 
         return {
